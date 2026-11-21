@@ -3,6 +3,7 @@
 // It mimics an AI Agent + "Respond to Webhook" returning { "output": "..." }.
 import express from 'express';
 import multer from 'multer';
+import fs from 'node:fs';
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -23,6 +24,18 @@ app.all('/webhook/biology-notes', upload.any(), async (req, res) => {
     }, null, 2) + '\n```' });
   }
 
+  if (task === 'podcast') {
+    return res.json({ output: JSON.stringify({
+      title: 'Power Plants of the Cell',
+      lines: [
+        { speaker: 'Alex', text: 'Welcome back to Bio in Ten! Today: how your cells make energy.' },
+        { speaker: 'Sam', text: 'It all starts with glycolysis, in the cytoplasm, splitting glucose into two pyruvate.' },
+        { speaker: 'Alex', text: 'So is that where most of the A T P comes from?' },
+        { speaker: 'Sam', text: 'Great question, but no. The electron transport chain makes about thirty four A T P.' },
+      ],
+    }) });
+  }
+
   if (task === 'mark') {
     const answered = /gradient|synthase/i.test(prompt.split("STUDENT'S ANSWER:")[1] || '');
     return res.json({ output: JSON.stringify({ score: answered ? 1 : 0, maxScore: 2, feedback: answered ? 'Good mention of the proton gradient, but you did not name where the electrons come from (NADH/FADH2).' : 'This misses the key idea of the proton gradient driving ATP synthase.' }) });
@@ -39,6 +52,13 @@ app.all('/webhook/biology-notes', upload.any(), async (req, res) => {
       `Received **${words}** words of notes and ${files.length} file(s): ${files.join(', ') || 'none'}.\n\n` +
       `Prompt received: ${prompt ? `${prompt.length} characters` : '**missing**'}.`,
   });
+});
+
+// Fake OpenAI text-to-speech endpoint (set TTS_URL=http://localhost:5678/v1/audio/speech)
+app.post('/v1/audio/speech', express.json(), (req, res) => {
+  if (!/^Bearer \S+/.test(req.get('authorization') || '')) return res.status(401).json({ error: 'no key' });
+  const file = req.body.voice === 'onyx' ? process.env.MOCK_MP3_B : process.env.MOCK_MP3_A;
+  res.type('audio/mpeg').send(file ? fs.readFileSync(file) : Buffer.from('ID3'));
 });
 
 app.listen(5678, () => console.log('Mock n8n webhook at http://localhost:5678/webhook/biology-notes'));

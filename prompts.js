@@ -95,6 +95,24 @@ ${convo || '(none)'}
 STUDENT'S NEW QUESTION: ${question}`;
     }
 
+    case 'podcast': {
+      const minutes = quizOptions.length === 'long' ? 6 : 3;
+      const words = minutes * 150;
+      return `${TUTOR}
+
+Write a script for a ${minutes}-minute study podcast (about ${words} words) that teaches the notes below.
+Two hosts:
+- "Alex": an enthusiastic host who asks the questions a student would ask, sometimes voices a common misconception so it can be corrected.
+- "Sam": a warm biology expert who explains clearly, with vivid analogies and real-life examples.
+Structure: a catchy 1–2 line intro → walk through the key concepts and processes in a logical order → a quick recap of the must-know facts → end with 2 quick-fire quiz questions for the listener (pause, then give the answer) and a one-line sign-off.
+Write for the ear: short sentences, natural conversation, no Markdown, no bullet points, no stage directions, no sound effects. Spell out symbols (say "A T P", "carbon dioxide", "H plus ions").
+${extra(question)}
+Respond with ONLY valid JSON (no Markdown, no code fences), in exactly this shape:
+{"title": "episode title", "lines": [{"speaker": "Alex", "text": "..."}, {"speaker": "Sam", "text": "..."}]}
+
+${notesBlock(notes)}`;
+    }
+
     case 'flashcards':
       return `${TUTOR}
 
@@ -157,4 +175,13 @@ export function normalizeQuiz(q) {
     })
     .filter(Boolean);
   return questions.length ? { title: String(q.title || 'Quiz'), questions } : null;
+}
+
+/** Validate/normalise a podcast script; returns null if unusable. */
+export function normalizePodcast(p) {
+  if (!p || !Array.isArray(p.lines)) return null;
+  const lines = p.lines
+    .filter((l) => l && typeof l.text === 'string' && l.text.trim())
+    .map((l) => ({ speaker: /sam/i.test(l.speaker) ? 'Sam' : 'Alex', text: l.text.trim().slice(0, 3000) }));
+  return lines.length ? { title: String(p.title || 'Study podcast'), lines } : null;
 }

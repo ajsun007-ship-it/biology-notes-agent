@@ -191,3 +191,29 @@ select {
 .chip:hover { border-color: var(--accent); }
 .chat-form { display: flex; gap: 8px; }
 .chat-form input { margin-top: 0; flex: 1; }
+
+/* ---------- Podcast ---------- */
+.podcast-head { display: flex; align-items: center; gap: 14px; }
+.podcast-art {
+  width: 56px; height: 56px; border-radius: 14px; display: grid; place-items: center; font-size: 28px; flex: none;
+  background: linear-gradient(135deg, #1f8a5b, #3a86c8);
+}
+.podcast-kicker { color: var(--muted); font-size: .85rem; }
+.podcast-head h2 { margin: 2px 0 0; }
+.podcast-player { display: grid; gap: 12px; }
+.podcast-audio { width: 100%; }
+.podcast-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.podcast-row a.btn-secondary { text-decoration: none; margin-left: auto; }
+.speed { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: .85rem; }
+.speed .chip.active { background: var(--accent); color: #fff; }
+.podcast-loading { padding: 18px 0; }
+.podcast-transcript-wrap { margin-top: 16px; }
+.podcast-transcript-wrap summary { cursor: pointer; color: var(--accent); font-weight: 500; }
+.podcast-transcript { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 6px; max-height: 360px; overflow-y: auto; }
+.podcast-transcript li { padding: 8px 12px; border-radius: 10px; border-left: 3px solid var(--border); }
+.podcast-transcript li.speaker-alex strong { color: #3a86c8; }
+.podcast-transcript li.speaker-sam strong { color: var(--accent); }
+.podcast-transcript li.speaking { background: var(--accent-soft); border-left-color: var(--accent); }
+.podcast-transcript.clickable li { cursor: pointer; }
+.podcast-transcript.clickable li:hover { background: var(--accent-soft); }
+#podcast-status { margin: 12px 0; }

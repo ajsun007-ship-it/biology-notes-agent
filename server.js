@@ -6,7 +6,8 @@ import { randomUUID } from 'node:crypto';
 import { extractText, getDocumentProxy } from 'unpdf';
 import mammoth from 'mammoth';
 import { fileURLToPath } from 'node:url';
-import { buildPrompt, parseJsonReply, normalizeQuiz } from './prompts.js';
+import { buildPrompt, parseJsonReply, normalizeQuiz, normalizePodcast } from './prompts.js';
+import { audioEnabled, recordEpisode, getEpisode } from './podcast.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -17,7 +18,7 @@ const N8N_WEBHOOK_METHOD = (process.env.N8N_WEBHOOK_METHOD || 'POST').toUpperCas
 // Most servers reject URLs longer than ~8 KB, so cap notes sent via GET.
 const MAX_GET_NOTES_CHARS = Number(process.env.MAX_GET_NOTES_CHARS) || 6000;
 const MAX_FILE_MB = Number(process.env.MAX_FILE_MB) || 10;
-const AGENT_TIMEOUT_MS = (Number(process.env.AGENT_TIMEOUT_SECONDS) || 120) * 1000;
+const AGENT_TIMEOUT_MS = (Number(process.env.AGENT_TIMEOUT_SECONDS) || 180) * 1000;
 
 const TEXT_EXTENSIONS = new Set(['.txt', '.md', '.markdown', '.csv', '.json', '.html', '.rtf']);
 const ALLOWED_EXTENSIONS = new Set([...TEXT_EXTENSIONS, '.pdf', '.docx']);
@@ -40,7 +41,7 @@ app.get('/vendor/marked.min.js', (_req, res) => res.sendFile(path.join(__dirname
 app.get('/vendor/purify.min.js', (_req, res) => res.sendFile(path.join(__dirname, 'node_modules/dompurify/dist/purify.min.js')));
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, webhookConfigured: Boolean(N8N_WEBHOOK_URL), method: N8N_WEBHOOK_METHOD });
+  res.json({ ok: true, webhookConfigured: Boolean(N8N_WEBHOOK_URL), method: N8N_WEBHOOK_METHOD, podcastAudio: audioEnabled() });
 });
 
 /**
@@ -91,7 +92,7 @@ app.post('/api/analyze', upload.array('files', 5), async (req, res) => {
   }
 
   const notes = textParts.join('\n\n');
-  const quizOptions = { count: req.body.quizCount, difficulty: req.body.quizDifficulty };
+  const quizOptions = { count: req.body.quizCount, difficulty: req.body.quizDifficulty, length: req.body.podcastLength };
 
   try {
     const output = await callAgent(
@@ -99,6 +100,7 @@ app.post('/api/analyze', upload.array('files', 5), async (req, res) => {
       files,
     );
     const body = { output, notes };
+    if (task === 'podcast') Object.assign(body, await finishPodcast(output));
     if (task === 'quiz') {
       body.quiz = normalizeQuiz(parseJsonReply(output));
       if (!body.quiz) console.warn('Quiz reply was not valid quiz JSON; showing it as text.');
@@ -116,7 +118,7 @@ app.post('/api/analyze', upload.array('files', 5), async (req, res) => {
 app.post('/api/ask', async (req, res) => {
   const { task, notes = '', question = '', history = [], quizOptions = {}, item, studentAnswer = '', sessionId } = req.body || {};
 
-  if (!['followup', 'quiz', 'mark', 'summarize', 'flashcards', 'explain'].includes(task)) {
+  if (!['followup', 'quiz', 'mark', 'summarize', 'flashcards', 'explain', 'podcast'].includes(task)) {
     return res.status(400).json({ error: 'Unknown task.' });
   }
   if (task === 'followup' && !String(question).trim()) {
@@ -139,6 +141,7 @@ app.post('/api/ask', async (req, res) => {
       const quiz = normalizeQuiz(parseJsonReply(output));
       return res.json({ output, quiz });
     }
+    if (task === 'podcast') return res.json({ output, ...(await finishPodcast(output)) });
     if (task === 'mark') {
       const m = parseJsonReply(output);
       if (m && Number.isFinite(Number(m.score))) {
@@ -152,6 +155,29 @@ app.post('/api/ask', async (req, res) => {
   } catch (err) {
     sendAgentError(res, err);
   }
+});
+
+/** Parse the agent's podcast script and, if text-to-speech is configured, record it. */
+async function finishPodcast(output) {
+  const podcast = normalizePodcast(parseJsonReply(output));
+  if (!podcast) return { podcast: null };
+  if (!audioEnabled()) return { podcast: { ...podcast, audioUrl: null } };
+  try {
+    const id = await recordEpisode(podcast);
+    return { podcast: { ...podcast, audioUrl: `/api/podcast/${id}.mp3` } };
+  } catch (err) {
+    console.error('Podcast recording failed:', err.message);
+    // Still return the script so the browser can read it aloud.
+    return { podcast: { ...podcast, audioUrl: null, audioError: 'Recording the voices failed, so your browser will read the script instead.' } };
+  }
+}
+
+app.get('/api/podcast/:id.mp3', (req, res) => {
+  const audio = getEpisode(req.params.id);
+  if (!audio) return res.status(404).send('This episode has expired. Generate it again.');
+  res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600' });
+  if (req.query.download) res.set('Content-Disposition', 'attachment; filename="biology-podcast.mp3"');
+  res.send(audio);
 });
 
 class AgentError extends Error {

@@ -83,9 +83,13 @@ fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInpu
 ['dragleave', 'drop'].forEach((ev) => dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); }));
 dropzone.addEventListener('drop', (e) => addFiles(e.dataTransfer.files));
 
-// Show quiz settings only when "Quiz me" is selected
+// Show extra settings only for "Quiz me" and "Podcast"
 form.querySelectorAll('input[name="task"]').forEach((r) =>
-  r.addEventListener('change', () => { $('quiz-options').hidden = form.querySelector('input[name="task"]:checked').value !== 'quiz'; }));
+  r.addEventListener('change', () => {
+    const task = form.querySelector('input[name="task"]:checked').value;
+    $('quiz-options').hidden = task !== 'quiz';
+    $('podcast-options').hidden = task !== 'podcast';
+  }));
 
 // ---------- Main submit ----------
 form.addEventListener('submit', async (e) => {
@@ -105,9 +109,11 @@ form.addEventListener('submit', async (e) => {
   data.append('sessionId', state.sessionId);
   data.append('quizCount', quizOptions().count);
   data.append('quizDifficulty', quizOptions().difficulty);
+  data.append('podcastLength', $('podcast-length').value);
 
-  setLoading(submitBtn, true, task === 'quiz' ? 'Writing your quiz…' : 'Agent is working…');
-  showLoadingOutput(task === 'quiz' ? 'The agent is writing your quiz…' : 'The agent is reading your notes…');
+  setLoading(submitBtn, true, task === 'quiz' ? 'Writing your quiz…' : task === 'podcast' ? 'Making your podcast…' : 'Agent is working…');
+  if (task === 'podcast') { outputCard.hidden = true; showPodcastLoading(); }
+  else showLoadingOutput(task === 'quiz' ? 'The agent is writing your quiz…' : 'The agent is reading your notes…');
 
   try {
     const res = await fetch('/api/analyze', { method: 'POST', body: data });
@@ -119,10 +125,14 @@ form.addEventListener('submit', async (e) => {
     chatMessages.innerHTML = '';
     chatCard.hidden = false;
 
-    if (json.quiz) startQuiz(json.quiz);
+    if (task === 'podcast') {
+      if (json.podcast) showPodcast(json.podcast);
+      else { podcastCard.hidden = true; showMarkdown(json.output || '_The agent did not return a podcast script._'); }
+    } else if (json.quiz) startQuiz(json.quiz);
     else showMarkdown(json.output || '_The agent returned an empty response._');
   } catch (err) {
     outputCard.hidden = true;
+    if (task === 'podcast') podcastCard.hidden = true;
     showError(formError, err.message);
   } finally {
     setLoading(submitBtn, false, 'Send to agent');
@@ -177,6 +187,7 @@ $('download-btn').addEventListener('click', () => {
   URL.revokeObjectURL(a.href);
 });
 $('quiz-me-btn').addEventListener('click', () => requestQuiz());
+$('podcast-btn').addEventListener('click', () => requestPodcast());
 
 async function requestQuiz(extraInstruction = '') {
   if (!state.notes) return;
@@ -411,3 +422,131 @@ async function sendChat(text) {
 
 chatForm.addEventListener('submit', (e) => { e.preventDefault(); sendChat(chatInput.value); });
 document.querySelectorAll('.chip').forEach((chip) => chip.addEventListener('click', () => sendChat(chip.textContent)));
+
+// ---------- Podcast ----------
+const podcastCard = $('podcast-card');
+const podcastPlayer = $('podcast-player');
+const podcastStatus = $('podcast-status');
+const transcriptEl = $('podcast-transcript');
+const speech = { lines: [], index: 0, playing: false, rate: 1, voices: {} };
+
+function stopSpeech() {
+  speech.playing = false;
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  transcriptEl.querySelectorAll('.speaking').forEach((li) => li.classList.remove('speaking'));
+}
+
+function showPodcastLoading() {
+  stopSpeech();
+  podcastCard.hidden = false;
+  $('podcast-title').textContent = 'Recording your episode…';
+  podcastStatus.textContent = 'The agent is writing the script, then the hosts record it. This usually takes 30–90 seconds.';
+  podcastPlayer.innerHTML = '<div class="podcast-loading"><span class="typing"><i></i><i></i><i></i></span></div>';
+  transcriptEl.innerHTML = '';
+  podcastCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function requestPodcast() {
+  if (!state.notes) return;
+  const btn = $('podcast-btn');
+  btn.disabled = true;
+  showPodcastLoading();
+  try {
+    const json = await postJson('/api/ask', {
+      task: 'podcast', notes: state.notes, quizOptions: { length: $('podcast-length').value }, sessionId: state.sessionId,
+    });
+    if (json.podcast) showPodcast(json.podcast);
+    else throw new Error('The agent did not return a podcast script. Try again.');
+  } catch (err) {
+    $('podcast-title').textContent = 'Podcast';
+    podcastPlayer.innerHTML = '';
+    podcastStatus.textContent = '';
+    podcastStatus.append(el('span', { class: 'error' }, err.message));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function showPodcast(p) {
+  stopSpeech();
+  podcastCard.hidden = false;
+  $('podcast-title').textContent = p.title;
+  podcastPlayer.innerHTML = '';
+  transcriptEl.innerHTML = '';
+  p.lines.forEach((line, i) => {
+    transcriptEl.append(el('li', { class: `speaker-${line.speaker.toLowerCase()}`, 'data-i': i },
+      el('strong', {}, `${line.speaker}: `), line.text));
+  });
+
+  const speeds = el('div', { class: 'speed' }, el('span', {}, 'Speed'));
+  [1, 1.25, 1.5, 2].forEach((r) => {
+    speeds.append(el('button', { type: 'button', class: `chip${r === 1 ? ' active' : ''}`, onclick: (e) => {
+      speeds.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+      setRate(r);
+    } }, `${r}×`));
+  });
+
+  if (p.audioUrl) {
+    podcastStatus.textContent = 'Press play to listen. You can download the episode for the bus or the gym.';
+    const audio = el('audio', { controls: '', preload: 'auto', src: p.audioUrl, class: 'podcast-audio' });
+    setRate = (r) => { audio.playbackRate = r; };
+    podcastPlayer.append(audio, el('div', { class: 'podcast-row' }, speeds,
+      el('a', { class: 'btn-secondary', href: `${p.audioUrl}?download=1`, download: 'biology-podcast.mp3' }, '⬇ Download MP3')));
+  } else {
+    podcastStatus.textContent = p.audioError ||
+      'Playing with your browser\'s built-in voices. (Add an OpenAI API key to the server for studio-quality voices and MP3 downloads.)';
+    if (!window.speechSynthesis) {
+      podcastStatus.textContent = 'Your browser cannot read text aloud — read the transcript below instead.';
+      return;
+    }
+    speech.lines = p.lines;
+    speech.index = 0;
+    const playBtn = el('button', { type: 'button', class: 'btn btn-inline' }, '▶ Play');
+    const restartBtn = el('button', { type: 'button', class: 'btn-secondary' }, '⏮ Restart');
+    playBtn.addEventListener('click', () => {
+      if (speech.playing) { speech.playing = false; speechSynthesis.cancel(); playBtn.textContent = '▶ Play'; }
+      else { speech.playing = true; playBtn.textContent = '⏸ Pause'; speakLine(playBtn); }
+    });
+    restartBtn.addEventListener('click', () => {
+      stopSpeech(); speech.index = 0; speech.playing = true; playBtn.textContent = '⏸ Pause'; speakLine(playBtn);
+    });
+    setRate = (r) => { speech.rate = r; };
+    podcastPlayer.append(el('div', { class: 'podcast-row' }, playBtn, restartBtn, speeds));
+    transcriptEl.querySelectorAll('li').forEach((li) => li.addEventListener('click', () => {
+      stopSpeech(); speech.index = Number(li.dataset.i); speech.playing = true; playBtn.textContent = '⏸ Pause'; speakLine(playBtn);
+    }));
+    transcriptEl.classList.add('clickable');
+  }
+  podcastCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+let setRate = () => {};
+
+function pickVoices() {
+  const all = speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
+  const prefer = (re) => all.find((v) => re.test(v.name));
+  const alex = prefer(/samantha|female|zira|aria|jenny|google us english/i) || all[0];
+  const sam = prefer(/daniel|male|david|guy|google uk english male|alex/i) || all.find((v) => v !== alex) || alex;
+  speech.voices = { Alex: alex, Sam: sam === alex ? all[1] || alex : sam };
+}
+
+function speakLine(playBtn) {
+  if (!speech.playing) return;
+  if (speech.index >= speech.lines.length) {
+    speech.playing = false; speech.index = 0; playBtn.textContent = '▶ Play again';
+    transcriptEl.querySelectorAll('.speaking').forEach((li) => li.classList.remove('speaking'));
+    return;
+  }
+  if (!speech.voices.Alex) pickVoices();
+  const line = speech.lines[speech.index];
+  const u = new SpeechSynthesisUtterance(line.text);
+  u.voice = speech.voices[line.speaker] || null;
+  u.rate = speech.rate;
+  u.pitch = line.speaker === 'Alex' ? 1.1 : 0.9;
+  transcriptEl.querySelectorAll('li').forEach((li, i) => li.classList.toggle('speaking', i === speech.index));
+  transcriptEl.children[speech.index]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  u.onend = () => { if (speech.playing) { speech.index += 1; speakLine(playBtn); } };
+  speechSynthesis.speak(u);
+}
+if (window.speechSynthesis) speechSynthesis.addEventListener?.('voiceschanged', pickVoices);

@@ -42,6 +42,16 @@
         <label><input type="radio" name="task" value="flashcards" /> <span>🃏 Flashcards</span></label>
         <label><input type="radio" name="task" value="quiz" /> <span>🎯 Quiz me</span></label>
         <label><input type="radio" name="task" value="explain" /> <span>💡 Explain concepts</span></label>
+        <label><input type="radio" name="task" value="podcast" /> <span>🎧 Podcast</span></label>
+      </div>
+
+      <div id="podcast-options" class="quiz-options" hidden>
+        <label>Episode length
+          <select id="podcast-length">
+            <option value="short" selected>Short — about 3 minutes</option>
+            <option value="long">Longer — about 6 minutes</option>
+          </select>
+        </label>
       </div>
 
       <div id="quiz-options" class="quiz-options" hidden>
@@ -78,12 +88,29 @@
         <h2 id="output-title">Agent response</h2>
         <div class="output-actions">
           <button id="quiz-me-btn" type="button" class="btn-secondary">🎯 Quiz me on this</button>
+          <button id="podcast-btn" type="button" class="btn-secondary">🎧 Make a podcast</button>
           <button id="copy-btn" type="button" class="btn-secondary">Copy</button>
           <button id="download-btn" type="button" class="btn-secondary">Download</button>
         </div>
       </div>
       <div id="output" class="markdown"></div>
       <div id="quiz" class="quiz" hidden></div>
+    </section>
+
+    <section id="podcast-card" class="card podcast" hidden aria-live="polite">
+      <div class="podcast-head">
+        <div class="podcast-art" aria-hidden="true">🎧</div>
+        <div>
+          <div class="podcast-kicker">Study podcast · Alex &amp; Sam</div>
+          <h2 id="podcast-title">Your episode</h2>
+        </div>
+      </div>
+      <p id="podcast-status" class="muted"></p>
+      <div id="podcast-player" class="podcast-player"></div>
+      <details id="podcast-transcript-wrap" class="podcast-transcript-wrap" open>
+        <summary>Transcript</summary>
+        <ol id="podcast-transcript" class="podcast-transcript"></ol>
+      </details>
     </section>
 
     <section id="chat-card" class="card chat" hidden>

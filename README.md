@@ -32,6 +32,7 @@ N8N_WEBHOOK_URL=http://localhost:5678/webhook/biology-notes npm start   # termin
 ## Study features
 
 - **Interactive quizzes** — choose 5/10/15 questions and a difficulty. Multiple-choice answers are marked instantly with an explanation; short answers are marked by the AI out of 2 with feedback. The results screen shows a grade, the questions to review, and buttons to retry missed questions, get a new quiz focused on weak spots, or have the tutor explain your mistakes.
+- **AI study podcast** — "🎧 Podcast" (or "Make a podcast" under any answer) has the agent write a 3- or 6-minute conversation between two hosts, Alex (curious student) and Sam (biology expert), covering the notes, with a recap and quick-fire quiz at the end. With `OPENAI_API_KEY` set, the server records each line with OpenAI text-to-speech and joins them into one MP3 (play, change speed, download). Without a key, the page reads the script aloud with the browser's built-in voices. Episodes are kept in memory for 1 hour.
 - **Follow-up chat** — ask questions about your notes under any answer, with one-click prompts ("Explain that more simply", "Give me a memory trick"…). The browser keeps the extracted notes and recent conversation and sends them with each question, so no re-uploading is needed.
 
 ## GET vs POST webhooks
@@ -66,7 +67,7 @@ Set `N8N_WEBHOOK_METHOD` to match the HTTP Method of your n8n Webhook node.
 |-------------|----------------------------------------------------------------|
 | `prompt`    | Full instructions for the AI Agent (use this in n8n)          |
 | `notes`     | Pasted text plus text extracted from every file (TXT, MD, PDF, DOCX) |
-| `task`      | `summarize`, `flashcards`, `explain`, `quiz`, `followup`, `mark` |
+| `task`      | `summarize`, `flashcards`, `explain`, `quiz`, `followup`, `mark`, `podcast` |
 | `question`  | Optional extra instruction from the user                       |
 | `fileNames` | JSON array of uploaded file names                              |
 | `sessionId` | Random ID per browser tab (for agent memory)                   |
@@ -87,6 +88,9 @@ Plain text, `{"output": "..."}`, `[{"output": "..."}]`, and also the keys `text`
 | `N8N_AUTH_HEADER_VALUE` | —       | Optional header value                  |
 | `PORT`                  | `3000`  | Port for the web app                   |
 | `MAX_FILE_MB`           | `10`    | Max size per uploaded file             |
-| `AGENT_TIMEOUT_SECONDS` | `120`   | How long to wait for the agent         |
+| `AGENT_TIMEOUT_SECONDS` | `180`   | How long to wait for the agent         |
+| `OPENAI_API_KEY`        | —       | Optional: realistic podcast voices (MP3) |
+| `TTS_MODEL`             | `gpt-4o-mini-tts` | OpenAI TTS model (`tts-1` also works) |
+| `TTS_VOICE_ALEX` / `TTS_VOICE_SAM` | `coral` / `onyx` | Voices for the two hosts |
 
 > Use the `/webhook/...` **production** URL with the workflow activated. The `/webhook-test/...` URL only works while you have "Listen for test event" running in the editor.
