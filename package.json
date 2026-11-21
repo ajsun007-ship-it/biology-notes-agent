@@ -1,0 +1,22 @@
+{
+  "name": "biology-notes-agent",
+  "version": "1.0.0",
+  "description": "Upload biology notes, send them to an n8n agent webhook, and display the agent's response.",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "mock": "node mock-n8n.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.18",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "marked": "^12.0.2",
+    "multer": "^1.4.5-lts.1"
+  }
+}

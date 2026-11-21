@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Biology Notes Agent</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="vendor/marked.min.js" defer></script>
+  <script src="vendor/purify.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="logo" aria-hidden="true">🧬</div>
+      <h1>Welcome to Biology Notes Agent</h1>
+      <p>Upload your biology notes and let the AI agent summarize them, build flashcards, quiz you, or answer your questions.</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <form id="notes-form" class="card" novalidate>
+      <h2>1. Add your notes</h2>
+
+      <label id="dropzone" class="dropzone" for="file-input">
+        <input id="file-input" name="files" type="file" multiple
+               accept=".txt,.md,.markdown,.csv,.json,.html,.rtf,.pdf,.doc,.docx" />
+        <span class="dz-icon" aria-hidden="true">📄</span>
+        <span class="dz-text"><strong>Click to upload</strong> or drag &amp; drop</span>
+        <span class="dz-hint">TXT, MD, PDF, DOCX — up to 5 files</span>
+      </label>
+      <ul id="file-list" class="file-list"></ul>
+
+      <details class="paste">
+        <summary>…or paste notes as text</summary>
+        <textarea id="notes-text" name="notes" rows="8" placeholder="e.g. Mitochondria are the site of aerobic respiration…"></textarea>
+      </details>
+
+      <h2>2. What should the agent do?</h2>
+      <div class="tasks" role="radiogroup">
+        <label><input type="radio" name="task" value="summarize" checked /> <span>📝 Summarize</span></label>
+        <label><input type="radio" name="task" value="flashcards" /> <span>🃏 Flashcards</span></label>
+        <label><input type="radio" name="task" value="quiz" /> <span>❓ Quiz me</span></label>
+        <label><input type="radio" name="task" value="explain" /> <span>💡 Explain concepts</span></label>
+      </div>
+
+      <label class="field">
+        <span>Extra instructions or a question (optional)</span>
+        <input id="question" name="question" type="text" placeholder="e.g. Focus on the Krebs cycle" />
+      </label>
+
+      <button id="submit-btn" type="submit" class="btn">
+        <span class="btn-label">Send to agent</span>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+      <p id="form-error" class="error" role="alert" hidden></p>
+    </form>
+
+    <section id="output-card" class="card output" hidden aria-live="polite">
+      <div class="output-header">
+        <h2>Agent response</h2>
+        <div class="output-actions">
+          <button id="copy-btn" type="button" class="btn-secondary">Copy</button>
+          <button id="download-btn" type="button" class="btn-secondary">Download</button>
+        </div>
+      </div>
+      <div id="output" class="markdown"></div>
+    </section>
+  </main>
+
+  <footer class="footer">Powered by an n8n AI agent</footer>
+</body>
+</html>
