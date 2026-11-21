@@ -4,10 +4,15 @@ import { randomUUID } from 'node:crypto';
 
 const TTS_URL = process.env.TTS_URL || 'https://api.openai.com/v1/audio/speech';
 const TTS_MODEL = process.env.TTS_MODEL || 'gpt-4o-mini-tts';
-const VOICES = { Alex: process.env.TTS_VOICE_ALEX || 'coral', Sam: process.env.TTS_VOICE_SAM || 'onyx' };
+const VOICES = { Alex: process.env.TTS_VOICE_ALEX || 'ash', Sam: process.env.TTS_VOICE_SAM || 'sage' };
+// Delivery directions for gpt-4o-mini-tts. Override in .env with TTS_STYLE_ALEX / TTS_STYLE_SAM.
 const STYLE = {
-  Alex: 'Upbeat, curious podcast host. Natural, conversational and energetic.',
-  Sam: 'Warm, friendly biology teacher. Clear, calm and encouraging, explaining to a student.',
+  Alex: process.env.TTS_STYLE_ALEX ||
+    'Upbeat, curious co-host. Natural and conversational, with genuine reactions like "wow" and "oh, I see!". Medium pace.',
+  Sam: process.env.TTS_STYLE_SAM ||
+    'The warm, rich, soulful voice of a beloved daytime talk-show host. Unhurried and expressive, with a smile in the voice. ' +
+    'Lean into key words with heartfelt enthusiasm, use pauses for emphasis, and speak as if personally encouraging the listener ' +
+    'to believe they can master this. Inspiring, confident and kind, never rushed.',
 };
 const CONCURRENCY = 4;
 const KEEP_MS = 60 * 60 * 1000; // keep generated episodes for 1 hour

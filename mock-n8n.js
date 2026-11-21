@@ -57,7 +57,8 @@ app.all('/webhook/biology-notes', upload.any(), async (req, res) => {
 // Fake OpenAI text-to-speech endpoint (set TTS_URL=http://localhost:5678/v1/audio/speech)
 app.post('/v1/audio/speech', express.json(), (req, res) => {
   if (!/^Bearer \S+/.test(req.get('authorization') || '')) return res.status(401).json({ error: 'no key' });
-  const file = req.body.voice === 'onyx' ? process.env.MOCK_MP3_B : process.env.MOCK_MP3_A;
+  if (process.env.MOCK_LOG_TTS) console.log('TTS', req.body.voice, '|', (req.body.instructions || '').slice(0, 60));
+  const file = req.body.voice === 'sage' ? process.env.MOCK_MP3_B : process.env.MOCK_MP3_A;
   res.type('audio/mpeg').send(file ? fs.readFileSync(file) : Buffer.from('ID3'));
 });
 

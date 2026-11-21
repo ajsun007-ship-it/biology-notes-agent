@@ -91,6 +91,7 @@ Plain text, `{"output": "..."}`, `[{"output": "..."}]`, and also the keys `text`
 | `AGENT_TIMEOUT_SECONDS` | `180`   | How long to wait for the agent         |
 | `OPENAI_API_KEY`        | —       | Optional: realistic podcast voices (MP3) |
 | `TTS_MODEL`             | `gpt-4o-mini-tts` | OpenAI TTS model (`tts-1` also works) |
-| `TTS_VOICE_ALEX` / `TTS_VOICE_SAM` | `coral` / `onyx` | Voices for the two hosts |
+| `TTS_VOICE_ALEX` / `TTS_VOICE_SAM` | `ash` / `sage` | Voices for the two hosts (preview at openai.fm) |
+| `TTS_STYLE_ALEX` / `TTS_STYLE_SAM` | built-in | Plain-English delivery directions, e.g. "warm talk-show host" |
 
 > Use the `/webhook/...` **production** URL with the workflow activated. The `/webhook-test/...` URL only works while you have "Listen for test event" running in the editor.
