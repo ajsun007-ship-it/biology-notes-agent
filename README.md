@@ -32,6 +32,9 @@ N8N_WEBHOOK_URL=http://localhost:5678/webhook/biology-notes npm start   # termin
 ## Study features
 
 - **Interactive quizzes** — choose 5/10/15 questions and a difficulty. Multiple-choice answers are marked instantly with an explanation; short answers are marked by the AI out of 2 with feedback. The results screen shows a grade, the questions to review, and buttons to retry missed questions, get a new quiz focused on weak spots, or have the tutor explain your mistakes.
+- **IB & AP Biology mode** — students pick IB Diploma Biology SL/HL, AP Biology or general. Every prompt then follows that exam's conventions: IB command terms and markscheme points, or AP task verbs, scoring guidelines and science practices. Written quiz questions carry marks (2–4) and are marked one point per mark.
+- **🔍 Gap check** — compares the notes with the syllabus: coverage estimate, what's covered, partly covered and missing (SL vs HL aware), how the gaps are examined, and a 3-step revision plan.
+- **Exam knowledge base (optional, in n8n)** — give the agent search tools over the official syllabus, past papers, markschemes and examiner reports. See **[docs/n8n-knowledge-base.md](docs/n8n-knowledge-base.md)**.
 - **AI study podcast** — "🎧 Podcast" (or "Make a podcast" under any answer) has the agent write a 3- or 6-minute conversation between two hosts, Alex (curious student) and Sam (biology expert), covering the notes, with a recap and quick-fire quiz at the end. With `OPENAI_API_KEY` set, the server records each line with OpenAI text-to-speech and joins them into one MP3 (play, change speed, download). Without a key, the page reads the script aloud with the browser's built-in voices. Episodes are kept in memory for 1 hour.
 - **Follow-up chat** — ask questions about your notes under any answer, with one-click prompts ("Explain that more simply", "Give me a memory trick"…). The browser keeps the extracted notes and recent conversation and sends them with each question, so no re-uploading is needed.
 
@@ -67,9 +70,10 @@ Set `N8N_WEBHOOK_METHOD` to match the HTTP Method of your n8n Webhook node.
 |-------------|----------------------------------------------------------------|
 | `prompt`    | Full instructions for the AI Agent (use this in n8n)          |
 | `notes`     | Pasted text plus text extracted from every file (TXT, MD, PDF, DOCX) |
-| `task`      | `summarize`, `flashcards`, `explain`, `quiz`, `followup`, `mark`, `podcast` |
+| `task`      | `summarize`, `flashcards`, `explain`, `quiz`, `followup`, `mark`, `podcast`, `gapcheck` |
 | `question`  | Optional extra instruction from the user                       |
 | `fileNames` | JSON array of uploaded file names                              |
+| `exam`      | `ib_sl`, `ib_hl`, `ap` or empty (general)                      |
 | `sessionId` | Random ID per browser tab (for agent memory)                   |
 | `file0..4`  | The original files as binary (POST only, optional to use)      |
 
@@ -89,6 +93,7 @@ Plain text, `{"output": "..."}`, `[{"output": "..."}]`, and also the keys `text`
 | `PORT`                  | `3000`  | Port for the web app                   |
 | `MAX_FILE_MB`           | `10`    | Max size per uploaded file             |
 | `AGENT_TIMEOUT_SECONDS` | `180`   | How long to wait for the agent         |
+| `KNOWLEDGE_BASE`        | `false` | `true` once the n8n knowledge-base tools exist |
 | `OPENAI_API_KEY`        | —       | Optional: realistic podcast voices (MP3) |
 | `TTS_MODEL`             | `gpt-4o-mini-tts` | OpenAI TTS model (`tts-1` also works) |
 | `TTS_VOICE_ALEX` / `TTS_VOICE_SAM` | `ash` / `sage` | Voices for the two hosts (preview at openai.fm) |

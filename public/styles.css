@@ -217,3 +217,9 @@ select {
 .podcast-transcript.clickable li { cursor: pointer; }
 .podcast-transcript.clickable li:hover { background: var(--accent-soft); }
 #podcast-status { margin: 12px 0; }
+
+/* ---------- Exam picker & marks ---------- */
+.exam-picker { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+.exam-picker span { font-weight: 600; }
+.exam-picker select { flex: 1 1 220px; }
+.quiz-question .marks { display: inline-block; margin: -6px 0 12px; font-size: .85rem; font-weight: 600; color: var(--muted); }

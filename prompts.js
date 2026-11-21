@@ -4,9 +4,54 @@
 
 const MAX_NOTES_CHARS = Number(process.env.MAX_NOTES_CHARS) || 60000;
 
-const TUTOR = `You are a friendly, expert biology tutor helping a student aim for an A+.
+const BASE_TUTOR = `You are a friendly, expert biology tutor helping a student aim for top grades.
 Be accurate, use correct scientific terminology, and keep explanations clear and encouraging.
 Base your answers on the student's notes; where you add facts that are not in the notes, keep them standard and exam-relevant.`;
+
+// Exam-specific guidance. `tool` must match the tool name of the knowledge base attached to the n8n AI Agent.
+export const EXAMS = {
+  ib_sl: {
+    label: 'IB Diploma Biology SL',
+    tool: 'ib_biology_knowledge_base',
+    guide: `The student is preparing for IB Diploma Biology at STANDARD LEVEL (SL) — current guide, first assessed 2025, organised into four themes (A Unity and diversity, B Form and function, C Interaction and interdependence, D Continuity and change) across levels of organisation (molecules, cells, organisms, ecosystems). Do not require additional higher level (AHL) content from an SL student; you may mention it as extension only.`,
+  },
+  ib_hl: {
+    label: 'IB Diploma Biology HL',
+    tool: 'ib_biology_knowledge_base',
+    guide: `The student is preparing for IB Diploma Biology at HIGHER LEVEL (HL) — current guide, first assessed 2025, organised into four themes (A Unity and diversity, B Form and function, C Interaction and interdependence, D Continuity and change) across levels of organisation (molecules, cells, organisms, ecosystems). Include additional higher level (AHL) content.`,
+  },
+  ap: {
+    label: 'AP Biology',
+    tool: 'ap_biology_knowledge_base',
+    guide: `The student is preparing for the College Board AP Biology exam. The Course and Exam Description (CED) has 8 units: 1 Chemistry of Life, 2 Cell Structure and Function, 3 Cellular Energetics, 4 Cell Communication and Cell Cycle, 5 Heredity, 6 Gene Expression and Regulation, 7 Natural Selection, 8 Ecology — plus science practices (concept explanation, visual representations, questions and methods, representing and describing data, statistical tests and data analysis, argumentation). Refer to topics by unit where helpful.`,
+  },
+};
+
+const STYLE = {
+  ib: `IB exam conventions: questions start with an IB command term (e.g. state, outline, describe, explain, compare and contrast, distinguish, deduce, suggest, evaluate, discuss) and the command term sets the depth required. Markschemes award one mark per valid point (alternatives separated by "/", with "accept" / "do not accept" notes) and the number of marks signals how many points are needed. Data-based questions and experimental skills (variables, uncertainty, reliability) are common.`,
+  ap: `AP exam conventions: free-response questions use task verbs (identify, describe, explain, predict, justify, construct/draw, calculate, make a claim, support with evidence) and are scored with point-based scoring guidelines where each point needs a specific, precise idea. Common skills: experimental design (independent/dependent variable, controls, null hypothesis), interpreting graphs and data, and calculations (e.g. chi-square, Hardy-Weinberg, water potential, rate, percent change).`,
+};
+
+function tutor(exam) {
+  const e = EXAMS[exam];
+  if (!e) return BASE_TUTOR;
+  const style = exam === 'ap' ? STYLE.ap : STYLE.ib;
+  // Only mention the search tool once it exists in n8n — otherwise some models stall trying to call it.
+  const kb = process.env.KNOWLEDGE_BASE === 'true'
+    ? `KNOWLEDGE BASE: use your tool "${e.tool}" FIRST`
+    : null;
+  if (!kb) return `${BASE_TUTOR}
+
+${e.guide}
+${style}
+Use your own knowledge of the ${e.label} course. Never invent past-paper references.`;
+  return `${BASE_TUTOR}
+
+${e.guide}
+${style}
+
+${kb} (1–3 focused searches) for the relevant syllabus statements, past exam questions, markschemes/scoring guidelines and examiner/chief reader reports, and base your answer on what you find — match their wording and the points examiners reward. Never invent past-paper references. If it finds nothing relevant, rely on your own knowledge of the ${e.label} course.`;
+}
 
 const DIFFICULTY = {
   easy: 'Easy: test recall of key facts and definitions.',
@@ -25,7 +70,9 @@ function extra(question) {
 
 const MARKDOWN = 'Reply in clear Markdown with headings, short paragraphs and bullet points. Bold the key terms.';
 
-export function buildPrompt({ task, notes = '', question = '', history = [], quizOptions = {}, item, studentAnswer }) {
+export function buildPrompt({ task, notes = '', question = '', history = [], quizOptions = {}, item, studentAnswer, exam = '' }) {
+  const TUTOR = tutor(exam);
+  const examName = EXAMS[exam]?.label;
   switch (task) {
     case 'quiz': {
       const count = Math.min(Math.max(Number(quizOptions.count) || 5, 3), 15);
@@ -34,7 +81,7 @@ export function buildPrompt({ task, notes = '', question = '', history = [], qui
 
 Create a quiz of exactly ${count} questions on the notes below.
 Difficulty — ${difficulty}
-Use mostly multiple-choice questions with 4 options, plus 1–2 short-answer questions that need a 1–3 sentence explanation.
+Use mostly multiple-choice questions with 4 options, plus 1–2 written questions worth 2–4 marks each${examName ? `, written exactly in the style of real ${examName} exam questions (correct command terms / task verbs, and a markscheme with one point per mark)` : ''}.
 Make wrong options plausible (common misconceptions). Spread the correct option position randomly.
 ${extra(question)}
 Respond with ONLY valid JSON (no Markdown, no code fences, no text before or after), in exactly this shape:
@@ -51,8 +98,9 @@ Respond with ONLY valid JSON (no Markdown, no code fences, no text before or aft
     {
       "type": "short",
       "question": "question text",
+      "marks": 3,
       "modelAnswer": "an ideal full-marks answer",
-      "keyPoints": ["point the answer must mention", "another point"],
+      "keyPoints": ["markscheme point 1 (one mark)", "markscheme point 2", "markscheme point 3"],
       "explanation": "short teaching note"
     }
   ]
@@ -65,8 +113,7 @@ ${notesBlock(notes)}`;
     case 'mark':
       return `${TUTOR}
 
-Mark the student's answer to this short-answer question out of 2, like a fair but strict exam marker.
-2 = all key points correct, 1 = partly correct or missing a key point, 0 = incorrect or blank.
+Mark the student's answer out of ${marks(item)}, like a fair but strict ${examName || 'exam'} examiner: award one mark per markscheme point that is clearly and correctly made (accept equivalent wording, but not vague answers).
 
 QUESTION: ${item?.question || ''}
 MODEL ANSWER: ${item?.modelAnswer || ''}
@@ -74,7 +121,7 @@ KEY POINTS: ${(item?.keyPoints || []).join('; ')}
 STUDENT'S ANSWER: ${studentAnswer || '(blank)'}
 
 Respond with ONLY valid JSON (no Markdown, no code fences), in exactly this shape:
-{"score": 0, "maxScore": 2, "feedback": "1–3 sentences: what was good, what was missing, how to get full marks"}`;
+{"score": 0, "maxScore": ${marks(item)}, "feedback": "1–3 sentences: which points earned marks, which were missing, and the exact wording an examiner wants to see for full marks"}`;
 
     case 'followup': {
       const convo = history
@@ -113,6 +160,27 @@ Respond with ONLY valid JSON (no Markdown, no code fences), in exactly this shap
 ${notesBlock(notes)}`;
     }
 
+    case 'gapcheck':
+      return `${TUTOR}
+
+Do a syllabus GAP CHECK: compare the student's notes with the official ${examName || 'biology'} syllabus for the topic(s) these notes cover.
+${MARKDOWN}
+Use exactly these sections:
+## Coverage
+One line: an estimated coverage percentage for the topic(s), and which ${examName ? (exam === 'ap' ? 'unit(s)/topic(s)' : 'theme(s)/topic(s)') : 'topic(s)'} the notes belong to.
+## ✅ Covered well
+Bullet list.
+## ⚠️ Covered partly
+Bullet list — say exactly what detail is missing.
+## ❌ Missing
+Bullet list of syllabus content not in the notes, most exam-relevant first${exam === 'ib_sl' ? ' (SL content only; list any AHL content separately as "HL only — not needed for SL")' : ''}.
+## 🎯 How it's examined
+2–3 typical exam questions on the missing or weak areas, each with the marks it would carry and the key points examiners look for.
+## Next steps
+A short, prioritised 3-step revision plan.
+${extra(question)}
+${notesBlock(notes)}`;
+
     case 'flashcards':
       return `${TUTOR}
 
@@ -139,6 +207,11 @@ ${MARKDOWN}
 ${extra(question)}
 ${notesBlock(notes)}`;
   }
+}
+
+function marks(item) {
+  const m = Number(item?.marks);
+  return Number.isInteger(m) && m >= 1 && m <= 10 ? m : Math.max(2, Math.min((item?.keyPoints || []).length, 6));
 }
 
 /** Pull a JSON object out of an AI reply that may be wrapped in code fences or extra text. */
@@ -168,6 +241,7 @@ export function normalizeQuiz(q) {
       return {
         type: 'short',
         question: x.question,
+        marks: Number.isInteger(Number(x.marks)) && Number(x.marks) > 0 ? Number(x.marks) : undefined,
         modelAnswer: String(x.modelAnswer || x.answer || ''),
         keyPoints: Array.isArray(x.keyPoints) ? x.keyPoints.map(String) : [],
         explanation: String(x.explanation || ''),

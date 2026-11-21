@@ -29,6 +29,12 @@ const state = {
   sessionId: (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()),
 };
 
+// ---------- Exam picker (remembered in this browser) ----------
+const examSelect = $('exam');
+try { const saved = localStorage.getItem('exam'); if (saved !== null) examSelect.value = saved; } catch {}
+examSelect.addEventListener('change', () => { try { localStorage.setItem('exam', examSelect.value); } catch {} });
+const exam = () => examSelect.value;
+
 // ---------- Helpers ----------
 function md(text) {
   if (window.marked && window.DOMPurify) return DOMPurify.sanitize(marked.parse(text || ''));
@@ -54,7 +60,7 @@ const formatSize = (b) => (b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toF
 const quizOptions = () => ({ count: $('quiz-count').value, difficulty: $('quiz-difficulty').value });
 
 async function postJson(url, body) {
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exam: exam(), ...body }) });
   const json = await res.json().catch(() => ({ error: 'Invalid response from server.' }));
   if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
   return json;
@@ -110,10 +116,11 @@ form.addEventListener('submit', async (e) => {
   data.append('quizCount', quizOptions().count);
   data.append('quizDifficulty', quizOptions().difficulty);
   data.append('podcastLength', $('podcast-length').value);
+  data.append('exam', exam());
 
   setLoading(submitBtn, true, task === 'quiz' ? 'Writing your quiz…' : task === 'podcast' ? 'Making your podcast…' : 'Agent is working…');
   if (task === 'podcast') { outputCard.hidden = true; showPodcastLoading(); }
-  else showLoadingOutput(task === 'quiz' ? 'The agent is writing your quiz…' : 'The agent is reading your notes…');
+  else showLoadingOutput(task === 'quiz' ? 'The agent is writing your quiz…' : task === 'gapcheck' ? 'Comparing your notes with the syllabus…' : 'The agent is reading your notes…');
 
   try {
     const res = await fetch('/api/analyze', { method: 'POST', body: data });
@@ -129,7 +136,7 @@ form.addEventListener('submit', async (e) => {
       if (json.podcast) showPodcast(json.podcast);
       else { podcastCard.hidden = true; showMarkdown(json.output || '_The agent did not return a podcast script._'); }
     } else if (json.quiz) startQuiz(json.quiz);
-    else showMarkdown(json.output || '_The agent returned an empty response._');
+    else showMarkdown(json.output || '_The agent returned an empty response._', task === 'gapcheck' ? '🔍 Syllabus gap check' : 'Agent response');
   } catch (err) {
     outputCard.hidden = true;
     if (task === 'podcast') podcastCard.hidden = true;
@@ -155,10 +162,10 @@ function showLoadingOutput(msg) {
   outputCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function showMarkdown(text) {
+function showMarkdown(text, title = 'Agent response') {
   state.lastOutput = text;
   state.quiz = null;
-  outputTitle.textContent = 'Agent response';
+  outputTitle.textContent = title;
   outputEl.className = 'markdown';
   outputEl.hidden = false;
   outputEl.innerHTML = md(text);
@@ -188,6 +195,21 @@ $('download-btn').addEventListener('click', () => {
 });
 $('quiz-me-btn').addEventListener('click', () => requestQuiz());
 $('podcast-btn').addEventListener('click', () => requestPodcast());
+$('gap-btn').addEventListener('click', async (e) => {
+  if (!state.notes) return;
+  e.currentTarget.disabled = true;
+  showLoadingOutput('Comparing your notes with the syllabus…');
+  try {
+    const json = await postJson('/api/ask', { task: 'gapcheck', notes: state.notes, sessionId: state.sessionId });
+    showMarkdown(json.output || '_No gap check returned._', '🔍 Syllabus gap check');
+  } catch (err) {
+    outputEl.className = 'markdown';
+    outputEl.innerHTML = '';
+    outputEl.append(el('p', { class: 'error' }, err.message));
+  } finally {
+    $('gap-btn').disabled = false;
+  }
+});
 
 async function requestQuiz(extraInstruction = '') {
   if (!state.notes) return;
@@ -233,6 +255,7 @@ function renderQuestion() {
     el('span', {}, `Score: ${scoreText()}`));
   const bar = el('div', { class: 'progress-bar' }, el('div', { style: `width:${(qIndex / total) * 100}%` }));
   const questionEl = el('div', { class: 'quiz-question', html: md(q.question) });
+  if (q.type === 'short' && q.marks) questionEl.append(el('span', { class: 'marks' }, `[${q.marks} mark${q.marks > 1 ? 's' : ''}]`));
   const feedback = el('div', { class: 'quiz-feedback', hidden: '' });
   const nextBtn = el('button', { type: 'button', class: 'btn btn-inline', hidden: '', onclick: nextQuestion },
     qIndex + 1 < total ? 'Next question →' : 'See my results');

@@ -14,12 +14,22 @@
     <div class="hero-inner">
       <div class="logo" aria-hidden="true">🧬</div>
       <h1>Welcome to Biology Notes Agent</h1>
-      <p>Upload your biology notes and let the AI agent summarize them, build flashcards, quiz you, or answer your questions.</p>
+      <p>Upload your biology notes and get IB- and AP-style quizzes, marking, gap checks, podcasts and a tutor that answers your questions.</p>
     </div>
   </header>
 
   <main class="container">
     <form id="notes-form" class="card" novalidate>
+      <label class="exam-picker">
+        <span>🎓 I'm studying for</span>
+        <select id="exam">
+          <option value="ib_sl">IB Diploma Biology — SL</option>
+          <option value="ib_hl">IB Diploma Biology — HL</option>
+          <option value="ap">AP Biology</option>
+          <option value="">Other / general biology</option>
+        </select>
+      </label>
+
       <h2>1. Add your notes</h2>
 
       <label id="dropzone" class="dropzone" for="file-input">
@@ -43,6 +53,7 @@
         <label><input type="radio" name="task" value="quiz" /> <span>🎯 Quiz me</span></label>
         <label><input type="radio" name="task" value="explain" /> <span>💡 Explain concepts</span></label>
         <label><input type="radio" name="task" value="podcast" /> <span>🎧 Podcast</span></label>
+        <label><input type="radio" name="task" value="gapcheck" /> <span>🔍 Gap check</span></label>
       </div>
 
       <div id="podcast-options" class="quiz-options" hidden>
@@ -89,6 +100,7 @@
         <div class="output-actions">
           <button id="quiz-me-btn" type="button" class="btn-secondary">🎯 Quiz me on this</button>
           <button id="podcast-btn" type="button" class="btn-secondary">🎧 Make a podcast</button>
+          <button id="gap-btn" type="button" class="btn-secondary">🔍 Gap check</button>
           <button id="copy-btn" type="button" class="btn-secondary">Copy</button>
           <button id="download-btn" type="button" class="btn-secondary">Download</button>
         </div>

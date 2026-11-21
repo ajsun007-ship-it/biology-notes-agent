@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { extractText, getDocumentProxy } from 'unpdf';
 import mammoth from 'mammoth';
 import { fileURLToPath } from 'node:url';
-import { buildPrompt, parseJsonReply, normalizeQuiz, normalizePodcast } from './prompts.js';
+import { buildPrompt, parseJsonReply, normalizeQuiz, normalizePodcast, EXAMS } from './prompts.js';
 import { audioEnabled, recordEpisode, getEpisode } from './podcast.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -51,7 +51,8 @@ app.get('/api/health', (_req, res) => {
  * Fields sent to n8n (multipart/form-data for POST, query string for GET):
  *   prompt     full instructions for the AI Agent  ← use {{ $json.body.prompt }} in n8n
  *   notes      combined plain text of all notes
- *   task       summarize | flashcards | explain | quiz | followup | mark
+ *   task       summarize | flashcards | explain | quiz | followup | mark | podcast | gapcheck
+ *   exam       ib_sl | ib_hl | ap | '' (general)
  *   question   optional instruction / follow-up question
  *   sessionId  per-browser-tab ID (for n8n memory nodes)
  *   fileNames  JSON array of uploaded file names
@@ -96,7 +97,7 @@ app.post('/api/analyze', upload.array('files', 5), async (req, res) => {
 
   try {
     const output = await callAgent(
-      { task, notes, question, sessionId: req.body.sessionId, fileNames: files.map((f) => f.originalname), quizOptions },
+      { task, notes, question, sessionId: req.body.sessionId, fileNames: files.map((f) => f.originalname), quizOptions, exam: req.body.exam },
       files,
     );
     const body = { output, notes };
@@ -116,9 +117,9 @@ app.post('/api/analyze', upload.array('files', 5), async (req, res) => {
  * Body: { task, notes, question?, history?, quizOptions?, item?, studentAnswer?, sessionId? }
  */
 app.post('/api/ask', async (req, res) => {
-  const { task, notes = '', question = '', history = [], quizOptions = {}, item, studentAnswer = '', sessionId } = req.body || {};
+  const { task, notes = '', question = '', history = [], quizOptions = {}, item, studentAnswer = '', sessionId, exam } = req.body || {};
 
-  if (!['followup', 'quiz', 'mark', 'summarize', 'flashcards', 'explain', 'podcast'].includes(task)) {
+  if (!['followup', 'quiz', 'mark', 'summarize', 'flashcards', 'explain', 'podcast', 'gapcheck'].includes(task)) {
     return res.status(400).json({ error: 'Unknown task.' });
   }
   if (task === 'followup' && !String(question).trim()) {
@@ -134,7 +135,7 @@ app.post('/api/ask', async (req, res) => {
   try {
     const output = await callAgent({
       task, notes: String(notes), question: String(question).trim(), sessionId,
-      history: Array.isArray(history) ? history : [], quizOptions, item, studentAnswer: String(studentAnswer),
+      history: Array.isArray(history) ? history : [], quizOptions, item, studentAnswer: String(studentAnswer), exam,
     });
 
     if (task === 'quiz') {
@@ -188,16 +189,26 @@ class AgentError extends Error {
   }
 }
 
+/** Ask the agent, retrying once if it returns an empty reply (an occasional model hiccup). */
+async function callAgent(args, files = []) {
+  const first = await callAgentOnce(args, files);
+  if (first.trim()) return first;
+  console.warn(`Agent returned an empty reply for task "${args.task}" — retrying once.`);
+  return callAgentOnce(args, files);
+}
+
 /** Send one request to the n8n webhook and return the agent's reply as text. */
-async function callAgent({ task, notes, question = '', sessionId, fileNames = [], history, quizOptions, item, studentAnswer }, files = []) {
+async function callAgentOnce({ task, notes, question = '', sessionId, fileNames = [], history, quizOptions, item, studentAnswer, exam = '' }, files = []) {
+  exam = EXAMS[exam] ? exam : '';
   if (!N8N_WEBHOOK_URL) {
     throw new AgentError(500, 'N8N_WEBHOOK_URL is not configured on the server. Copy .env.example to .env and set it.');
   }
 
   const fields = {
-    prompt: buildPrompt({ task, notes, question, history, quizOptions, item, studentAnswer }),
+    prompt: buildPrompt({ task, notes, question, history, quizOptions, item, studentAnswer, exam }),
     notes,
     task,
+    exam,
     question,
     fileNames: JSON.stringify(fileNames),
     // n8n memory nodes need a session ID; the browser sends one per tab, otherwise generate one.
@@ -240,6 +251,9 @@ async function callAgent({ task, notes, question = '', sessionId, fileNames = []
   const raw = await upstream.text();
   if (upstream.status === 404 && /webhook-test/.test(N8N_WEBHOOK_URL)) {
     throw new AgentError(502, 'n8n test webhook is not listening. Click "Execute workflow" in the n8n editor and try again (test URLs work for one request at a time).', raw.slice(0, 500));
+  }
+  if (upstream.status === 524 || upstream.status === 504) {
+    throw new AgentError(504, 'The agent took longer than n8n allows (about 100 seconds) and the request was cut off. Try again, or choose a shorter option (fewer quiz questions / short podcast).');
   }
   if (!upstream.ok) {
     console.error(`n8n responded ${upstream.status}: ${raw.slice(0, 500)}`);
