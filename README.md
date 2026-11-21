@@ -10,6 +10,10 @@ Browser ──(upload)──▶ Express server /api/analyze ──(multipart POS
 
 The Node server sits in the middle so the webhook URL and any auth header stay private, and the browser never runs into CORS problems.
 
+| Welcome page | Interactive quiz |
+|---|---|
+| ![Welcome page](screenshot.png) | ![Quiz](quiz-screenshot.png) |
+
 ## Quick start
 
 ```bash
