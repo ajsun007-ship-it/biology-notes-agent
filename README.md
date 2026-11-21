@@ -25,6 +25,11 @@ npm run mock                                                            # termin
 N8N_WEBHOOK_URL=http://localhost:5678/webhook/biology-notes npm start   # terminal 2
 ```
 
+## Study features
+
+- **Interactive quizzes** — choose 5/10/15 questions and a difficulty. Multiple-choice answers are marked instantly with an explanation; short answers are marked by the AI out of 2 with feedback. The results screen shows a grade, the questions to review, and buttons to retry missed questions, get a new quiz focused on weak spots, or have the tutor explain your mistakes.
+- **Follow-up chat** — ask questions about your notes under any answer, with one-click prompts ("Explain that more simply", "Give me a memory trick"…). The browser keeps the extracted notes and recent conversation and sends them with each question, so no re-uploading is needed.
+
 ## GET vs POST webhooks
 
 Set `N8N_WEBHOOK_METHOD` to match the HTTP Method of your n8n Webhook node.
@@ -40,15 +45,14 @@ Set `N8N_WEBHOOK_METHOD` to match the HTTP Method of your n8n Webhook node.
    - Respond: **Using 'Respond to Webhook' Node**
    - Optional: Authentication → Header Auth (matches `N8N_AUTH_HEADER_NAME` / `N8N_AUTH_HEADER_VALUE`)
 2. No file-parsing node is needed: the app extracts the text from PDF and Word (.docx) files itself and sends it in `notes`.
-3. **AI Agent** node, with a chat model connected. Example prompt (expression):
-   ```
-   You are a biology tutor. Task: {{ $json.body.task }}.
-   Extra instructions: {{ $json.body.question }}
-   Notes:
-   {{ $json.body.notes }}
-   Reply in Markdown.
-   ```
-   For memory, use `{{ $json.body.sessionId }}` as the session key.
+3. **AI Agent** node, with a chat model connected.
+   - Source for Prompt: **Define below**
+   - Prompt (Expression): `{{ $json.body.prompt }}`
+
+   The app writes the complete instructions for each mode (summary, flashcards, quiz JSON,
+   marking, follow-up chat) into the `prompt` field — see `prompts.js`. Edit that file to change
+   how the tutor behaves; n8n doesn't need to change.
+   If you use a memory node, set its Session ID to **Define below** → `{{ $json.body.sessionId }}`.
 4. **Respond to Webhook** node → Respond With: JSON, body `{ "output": {{ JSON.stringify($json.output) }} }`
    (plain text also works).
 
@@ -56,8 +60,9 @@ Set `N8N_WEBHOOK_METHOD` to match the HTTP Method of your n8n Webhook node.
 
 | Field       | Description                                                    |
 |-------------|----------------------------------------------------------------|
+| `prompt`    | Full instructions for the AI Agent (use this in n8n)          |
 | `notes`     | Pasted text plus text extracted from every file (TXT, MD, PDF, DOCX) |
-| `task`      | `summarize`, `flashcards`, `quiz` or `explain`                 |
+| `task`      | `summarize`, `flashcards`, `explain`, `quiz`, `followup`, `mark` |
 | `question`  | Optional extra instruction from the user                       |
 | `fileNames` | JSON array of uploaded file names                              |
 | `sessionId` | Random ID per browser tab (for agent memory)                   |

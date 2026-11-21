@@ -40,8 +40,25 @@
       <div class="tasks" role="radiogroup">
         <label><input type="radio" name="task" value="summarize" checked /> <span>📝 Summarize</span></label>
         <label><input type="radio" name="task" value="flashcards" /> <span>🃏 Flashcards</span></label>
-        <label><input type="radio" name="task" value="quiz" /> <span>❓ Quiz me</span></label>
+        <label><input type="radio" name="task" value="quiz" /> <span>🎯 Quiz me</span></label>
         <label><input type="radio" name="task" value="explain" /> <span>💡 Explain concepts</span></label>
+      </div>
+
+      <div id="quiz-options" class="quiz-options" hidden>
+        <label>Questions
+          <select id="quiz-count">
+            <option value="5" selected>5</option>
+            <option value="10">10</option>
+            <option value="15">15</option>
+          </select>
+        </label>
+        <label>Difficulty
+          <select id="quiz-difficulty">
+            <option value="easy">Easy — key facts</option>
+            <option value="exam" selected>Exam level</option>
+            <option value="challenge">Challenge — A+ level</option>
+          </select>
+        </label>
       </div>
 
       <label class="field">
@@ -58,13 +75,32 @@
 
     <section id="output-card" class="card output" hidden aria-live="polite">
       <div class="output-header">
-        <h2>Agent response</h2>
+        <h2 id="output-title">Agent response</h2>
         <div class="output-actions">
+          <button id="quiz-me-btn" type="button" class="btn-secondary">🎯 Quiz me on this</button>
           <button id="copy-btn" type="button" class="btn-secondary">Copy</button>
           <button id="download-btn" type="button" class="btn-secondary">Download</button>
         </div>
       </div>
       <div id="output" class="markdown"></div>
+      <div id="quiz" class="quiz" hidden></div>
+    </section>
+
+    <section id="chat-card" class="card chat" hidden>
+      <h2>💬 Ask a follow-up</h2>
+      <p class="muted">Stuck on something? Ask about your notes — the tutor remembers this conversation.</p>
+      <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
+      <div class="chips">
+        <button type="button" class="chip">Explain that more simply</button>
+        <button type="button" class="chip">Give me a real-life example</button>
+        <button type="button" class="chip">What are common exam mistakes here?</button>
+        <button type="button" class="chip">Give me a memory trick for this</button>
+      </div>
+      <form id="chat-form" class="chat-form">
+        <input id="chat-input" type="text" placeholder="e.g. Why does the electron transport chain need oxygen?" autocomplete="off" />
+        <button id="chat-send" type="submit" class="btn btn-inline">Ask</button>
+      </form>
+      <p id="chat-error" class="error" role="alert" hidden></p>
     </section>
   </main>
 
