@@ -29,8 +29,8 @@ N8N_WEBHOOK_URL=http://localhost:5678/webhook/biology-notes npm start   # termin
 
 Set `N8N_WEBHOOK_METHOD` to match the HTTP Method of your n8n Webhook node.
 
-- **POST** (recommended): sends `multipart/form-data`, including the original PDF/DOCX files. In n8n, read fields from `$json.body.*`.
-- **GET**: sends the fields as URL query parameters. In n8n, read them from `$json.query.*` (e.g. `{{ $json.query.notes }}`). GET has no request body, so PDF/DOCX uploads are rejected with a clear message, and notes are capped at `MAX_GET_NOTES_CHARS` (default 6000) to stay under URL length limits.
+- **POST** (recommended): sends `multipart/form-data`, including the original files. In n8n, read fields from `$json.body.*`.
+- **GET**: sends the fields as URL query parameters. In n8n, read them from `$json.query.*` (e.g. `{{ $json.query.notes }}`). GET has no request body, so only the extracted text is sent (not the original files), and notes are capped at `MAX_GET_NOTES_CHARS` (default 6000) to stay under URL length limits.
 
 ## Setting up the n8n workflow
 
@@ -39,7 +39,7 @@ Set `N8N_WEBHOOK_METHOD` to match the HTTP Method of your n8n Webhook node.
    - Path: e.g. `biology-notes`
    - Respond: **Using 'Respond to Webhook' Node**
    - Optional: Authentication → Header Auth (matches `N8N_AUTH_HEADER_NAME` / `N8N_AUTH_HEADER_VALUE`)
-2. *(Optional, for PDFs)* **Extract from File** node → "Extract From PDF", binary property `file0`.
+2. No file-parsing node is needed: the app extracts the text from PDF and Word (.docx) files itself and sends it in `notes`.
 3. **AI Agent** node, with a chat model connected. Example prompt (expression):
    ```
    You are a biology tutor. Task: {{ $json.body.task }}.
@@ -56,12 +56,12 @@ Set `N8N_WEBHOOK_METHOD` to match the HTTP Method of your n8n Webhook node.
 
 | Field       | Description                                                    |
 |-------------|----------------------------------------------------------------|
-| `notes`     | Pasted text plus the contents of any text files (.txt, .md...) |
+| `notes`     | Pasted text plus text extracted from every file (TXT, MD, PDF, DOCX) |
 | `task`      | `summarize`, `flashcards`, `quiz` or `explain`                 |
 | `question`  | Optional extra instruction from the user                       |
 | `fileNames` | JSON array of uploaded file names                              |
 | `sessionId` | Random ID per browser tab (for agent memory)                   |
-| `file0..4`  | The original files as binary (use these for PDF/DOCX)          |
+| `file0..4`  | The original files as binary (POST only, optional to use)      |
 
 ### Response formats the app understands
 

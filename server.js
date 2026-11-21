@@ -3,6 +3,8 @@ import express from 'express';
 import multer from 'multer';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { extractText, getDocumentProxy } from 'unpdf';
+import mammoth from 'mammoth';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -17,7 +19,7 @@ const MAX_FILE_MB = Number(process.env.MAX_FILE_MB) || 10;
 const AGENT_TIMEOUT_MS = (Number(process.env.AGENT_TIMEOUT_SECONDS) || 120) * 1000;
 
 const TEXT_EXTENSIONS = new Set(['.txt', '.md', '.markdown', '.csv', '.json', '.html', '.rtf']);
-const ALLOWED_EXTENSIONS = new Set([...TEXT_EXTENSIONS, '.pdf', '.docx', '.doc']);
+const ALLOWED_EXTENSIONS = new Set([...TEXT_EXTENSIONS, '.pdf', '.docx']);
 
 const app = express();
 const upload = multer({
@@ -64,14 +66,25 @@ app.post('/api/analyze', upload.array('files', 5), async (req, res) => {
     return res.status(400).json({ error: 'Please upload a notes file or paste some notes.' });
   }
 
-  // Build combined text so the agent can work even without parsing binaries.
+  // Build the notes text the agent reads: pasted text + text extracted from every file.
   const textParts = [];
   if (pasted) textParts.push(pasted);
+  const unreadable = [];
   for (const f of files) {
-    const ext = path.extname(f.originalname).toLowerCase();
-    if (TEXT_EXTENSIONS.has(ext)) {
-      textParts.push(`--- ${f.originalname} ---\n${f.buffer.toString('utf8')}`);
+    let text = '';
+    try {
+      text = (await fileToText(f)).trim();
+    } catch (err) {
+      console.error(`Could not extract text from ${f.originalname}:`, err.message);
     }
+    if (text) textParts.push(`--- ${f.originalname} ---\n${text}`);
+    else unreadable.push(f.originalname);
+  }
+
+  if (textParts.length === 0) {
+    return res.status(400).json({
+      error: `Couldn't read any text from ${unreadable.join(', ')}. If it's a scanned PDF or photo, it contains images rather than text. Try a text-based PDF, a .docx/.txt file, or paste the notes instead.`,
+    });
   }
 
   const headers = {};
@@ -93,12 +106,6 @@ app.post('/api/analyze', upload.array('files', 5), async (req, res) => {
   const init = { method: N8N_WEBHOOK_METHOD, headers, signal: AbortSignal.timeout(AGENT_TIMEOUT_MS) };
 
   if (N8N_WEBHOOK_METHOD === 'GET') {
-    const binary = files.filter((f) => !TEXT_EXTENSIONS.has(path.extname(f.originalname).toLowerCase()));
-    if (binary.length) {
-      return res.status(400).json({
-        error: `PDF/Word files can't be sent to a GET webhook (${binary.map((f) => f.originalname).join(', ')}). Upload .txt/.md files or paste the text instead.`,
-      });
-    }
     if (notesText.length > MAX_GET_NOTES_CHARS) {
       return res.status(400).json({
         error: `Notes are too long for a GET webhook (${notesText.length.toLocaleString()} characters, max ${MAX_GET_NOTES_CHARS.toLocaleString()}). Shorten them, or switch the n8n webhook to POST.`,
@@ -142,6 +149,21 @@ app.post('/api/analyze', upload.array('files', 5), async (req, res) => {
     });
   }
 });
+
+/** Turn an uploaded file into plain text (PDF, Word .docx, or any text format). */
+async function fileToText(file) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ext === '.pdf') {
+    const pdf = await getDocumentProxy(new Uint8Array(file.buffer));
+    const { text } = await extractText(pdf, { mergePages: true });
+    return text;
+  }
+  if (ext === '.docx') {
+    const { value } = await mammoth.extractRawText({ buffer: file.buffer });
+    return value;
+  }
+  return file.buffer.toString('utf8');
+}
 
 /**
  * n8n can respond in many shapes depending on the "Respond to Webhook" node:
